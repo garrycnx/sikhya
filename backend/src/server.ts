@@ -14,14 +14,16 @@ import router from './routes';
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000');
 
+// Trust Railway's reverse proxy so rate-limiting and IP detection work correctly
+app.set('trust proxy', 1);
+
 app.use(helmet({
   crossOriginResourcePolicy: false,
   contentSecurityPolicy: false,
 }));
 // In production restrict to the actual Flutter web domain; in dev allow all origins
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean)
-  : true;
+// Mobile app sends no Origin header — allow all origins
+const allowedOrigins = true;
 
 app.options('*', cors());
 app.use(cors({
