@@ -12,16 +12,17 @@ export async function sendOtpSms(mobile: string, otp: string): Promise<void> {
   // Fast2SMS expects 10-digit Indian number (strip +91 or 91 prefix)
   const number = mobile.replace(/^\+?91/, '').replace(/\D/g, '');
 
-  const res = await fetch('https://www.fast2sms.com/dev/otp/send', {
+  const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
     method: 'POST',
     headers: {
       'authorization': apiKey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      variables_values: otp,
       route:            'otp',
-      mobile:           number,
+      variables_values: otp,
+      flash:            '0',
+      numbers:          number,
     }),
   });
 
