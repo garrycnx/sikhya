@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: school_mgmt_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: school_mgmt
+      POSTGRES_USER: school_admin
+      POSTGRES_PASSWORD: localdev_password_change_in_prod
+    ports: ['5433:5432']
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U school_admin -d school_mgmt']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: school_mgmt_redis
+    restart: unless-stopped
+    ports: ['6380:6379']
+    command: redis-server --appendonly yes --requirepass localdev_redis_pass
+    volumes: [redis_data:/data]
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: school_mgmt_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@sghk.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports: ['5050:80']
+    depends_on: [postgres]
+volumes:
+  postgres_data:
+  redis_data:
