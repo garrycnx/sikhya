@@ -22,10 +22,17 @@ const loginPinSchema = z.object({
 });
 
 export async function requestOtp(req: Request, res: Response) {
+  console.log('requestOtp body:', JSON.stringify(req.body));
   const p = requestOtpSchema.safeParse(req.body);
-  if (!p.success) return sendError(res, p.error.errors[0].message, 422);
+  if (!p.success) {
+    console.log('validation error:', p.error.errors);
+    return sendError(res, p.error.errors[0].message, 422);
+  }
   try { return sendSuccess(res, await AuthService.requestOtp(p.data.school_subdomain, p.data.mobile, p.data.admission_no)); }
-  catch (e: unknown) { return sendError(res, e instanceof Error ? e.message : 'Failed'); }
+  catch (e: unknown) {
+    console.error('requestOtp error:', e);
+    return sendError(res, e instanceof Error ? e.message : String(e));
+  }
 }
 
 export async function verifyOtp(req: Request, res: Response) {
