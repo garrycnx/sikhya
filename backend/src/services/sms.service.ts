@@ -25,8 +25,10 @@ export async function sendOtpSms(mobile: string, otp: string): Promise<void> {
     }),
   });
 
-  const data = await res.json() as { return: boolean; message?: string[] };
+  const data = await res.json() as { return: boolean; message?: string | string[] };
+  console.log('Fast2SMS response:', JSON.stringify(data));
   if (!data.return) {
-    throw new Error(`Fast2SMS error: ${data.message?.join(', ') ?? 'unknown'}`);
+    const msg = Array.isArray(data.message) ? data.message.join(', ') : (data.message ?? 'unknown');
+    throw new Error(`Fast2SMS error: ${msg}`);
   }
 }
