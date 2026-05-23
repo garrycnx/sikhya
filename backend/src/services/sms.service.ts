@@ -21,7 +21,7 @@ export async function sendOtpSms(mobile: string, otp: string): Promise<void> {
     body: JSON.stringify({
       variables_values: otp,
       route:            'otp',
-      numbers:          number,
+      mobile:           number,
     }),
   });
 
