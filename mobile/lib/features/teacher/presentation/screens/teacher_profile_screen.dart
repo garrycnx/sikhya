@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'teacher_dashboard_screen.dart';
 
@@ -12,6 +15,78 @@ class TeacherProfileScreen extends ConsumerWidget {
     final p = name.trim().split(RegExp(r'\s+'));
     if (p.length >= 2) return '${p[0][0]}${p[1][0]}'.toUpperCase();
     return p.isNotEmpty && p[0].isNotEmpty ? p[0][0].toUpperCase() : '?';
+  }
+
+  void _showEditDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> teacher) {
+    final nameCtrl = TextEditingController(text: teacher['full_name'] as String? ?? '');
+    final emailCtrl = TextEditingController(text: teacher['email'] as String? ?? '');
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(builder: (ctx, setModal) => AlertDialog(
+        title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextFormField(
+            controller: nameCtrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Full Name *',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email (optional)',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(
+            onPressed: saving ? null : () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: saving ? null : () async {
+              final name = nameCtrl.text.trim();
+              if (name.length < 2) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Name must be at least 2 characters')));
+                return;
+              }
+              setModal(() => saving = true);
+              try {
+                await ApiClient.instance.put(ApiConstants.teacherUpdateProfile, data: {
+                  'full_name': name,
+                  if (emailCtrl.text.trim().isNotEmpty) 'email': emailCtrl.text.trim(),
+                });
+                ref.invalidate(teacherDashboardProvider);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Profile updated')));
+                }
+              } on DioException catch (e) {
+                setModal(() => saving = false);
+                if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                  content: Text(e.response?.data?['error'] ?? 'Failed to update'),
+                  backgroundColor: Colors.red));
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            child: saving
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save'),
+          ),
+        ],
+      )),
+    );
   }
 
   @override
@@ -41,6 +116,13 @@ class TeacherProfileScreen extends ConsumerWidget {
                 pinned: true,
                 backgroundColor: const Color(0xFF0A2472),
                 automaticallyImplyLeading: false,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+                    tooltip: 'Edit Profile',
+                    onPressed: () => _showEditDialog(context, ref, teacher),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(

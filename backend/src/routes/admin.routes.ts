@@ -9,6 +9,8 @@ router.get('/stats',            Admin.getSchoolStats);
 router.get('/teachers',         Admin.listTeachers);
 router.post('/teachers',        Admin.createTeacher);
 router.delete('/teachers/:id',  Admin.deleteTeacher);
+router.post('/classes/seed-defaults', Admin.seedDefaultClasses);
+router.post('/classes',         Admin.createClass);
 router.get('/classes',          Admin.listClasses);
 router.get('/students',         Admin.listStudents);
 router.post('/students',        Admin.createStudent);

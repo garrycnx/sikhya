@@ -59,7 +59,12 @@ class _ParentAppShellState extends ConsumerState<ParentAppShell> {
   Widget build(BuildContext context) {
     final dashAsync = ref.watch(parentDashboardProvider);
 
-    return Scaffold(
+    return PopScope(
+      canPop: _tab == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _tab != 0) setState(() => _tab = 0);
+      },
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: dashAsync.when(
         loading: () => const _ShellSkeleton(),
@@ -102,7 +107,7 @@ class _ParentAppShellState extends ConsumerState<ParentAppShell> {
         current: _tab,
         onTap: (i) => setState(() => _tab = i),
       ),
-    );
+    ));
   }
 }
 

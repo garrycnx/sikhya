@@ -47,10 +47,13 @@ class ApiConstants {
   static String studentProfile(String studentId)     => '/teacher/students/$studentId/profile';
   static String studentUpdate(String studentId)      => '/teacher/students/$studentId';
   static String studentRemove(String studentId)      => '/teacher/students/$studentId';
+  // teacher profile
+  static const teacherUpdateProfile = '/teacher/profile';
   // admin
-  static const adminStats    = '/admin/stats';
-  static const adminTeachers = '/admin/teachers';
-  static const adminStudents = '/admin/students';
-  static const adminClasses  = '/admin/classes';
-  static const adminParents  = '/admin/parents';
+  static const adminStats              = '/admin/stats';
+  static const adminTeachers           = '/admin/teachers';
+  static const adminStudents           = '/admin/students';
+  static const adminClasses            = '/admin/classes';
+  static const adminParents            = '/admin/parents';
+  static const adminSeedDefaultClasses = '/admin/classes/seed-defaults';
 }

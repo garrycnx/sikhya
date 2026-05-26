@@ -71,6 +71,83 @@ export async function deleteTeacher(req: Request, res: Response) {
   } finally { client.release(); }
 }
 
+const createClassSchema = z.object({
+  name: z.string().min(1).max(50),
+  section: z.string().min(1).max(10),
+  room_number: z.string().optional(),
+});
+
+const DEFAULT_CLASSES = [
+  { name: 'Pre-Nursery', sections: ['A', 'B', 'C', 'D'] },
+  { name: 'Nursery',     sections: ['A', 'B', 'C', 'D'] },
+  { name: 'KG',          sections: ['A', 'B', 'C'] },
+  ...(Array.from({ length: 12 }, (_, i) => ({
+    name: String(i + 1),
+    sections: ['A', 'B', 'C', 'D', 'E'],
+  }))),
+];
+
+export async function createClass(req: Request, res: Response) {
+  const p = createClassSchema.safeParse(req.body);
+  if (!p.success) return sendError(res, p.error.errors[0].message, 422);
+  const schoolId = req.user!.school_id;
+  const client = await appPool.connect();
+  try {
+    await client.query(`SET app.current_school_id = '${schoolId}'`);
+    const ayRes = await client.query(
+      `SELECT id FROM academic_years WHERE school_id = $1 AND is_current = true`, [schoolId]
+    );
+    if (!ayRes.rows.length) return sendError(res, 'No active academic year', 400);
+    const ayId = ayRes.rows[0].id;
+    // Check duplicate
+    const dup = await client.query(
+      `SELECT id FROM classes WHERE school_id=$1 AND academic_year_id=$2 AND name=$3 AND section=$4`,
+      [schoolId, ayId, p.data.name, p.data.section]
+    );
+    if (dup.rows.length) return sendError(res, 'Class already exists', 409);
+    const r = await client.query(
+      `INSERT INTO classes (school_id, academic_year_id, name, section, room_number)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, name, section`,
+      [schoolId, ayId, p.data.name, p.data.section, p.data.room_number ?? null]
+    );
+    return sendCreated(res, r.rows[0]);
+  } catch (e: unknown) {
+    return sendError(res, e instanceof Error ? e.message : 'Failed');
+  } finally { client.release(); }
+}
+
+export async function seedDefaultClasses(req: Request, res: Response) {
+  const schoolId = req.user!.school_id;
+  const client = await appPool.connect();
+  try {
+    await client.query(`SET app.current_school_id = '${schoolId}'`);
+    const ayRes = await client.query(
+      `SELECT id FROM academic_years WHERE school_id = $1 AND is_current = true`, [schoolId]
+    );
+    if (!ayRes.rows.length) return sendError(res, 'No active academic year', 400);
+    const ayId = ayRes.rows[0].id;
+    let created = 0;
+    for (const cls of DEFAULT_CLASSES) {
+      for (const section of cls.sections) {
+        const existing = await client.query(
+          `SELECT id FROM classes WHERE school_id=$1 AND academic_year_id=$2 AND name=$3 AND section=$4`,
+          [schoolId, ayId, cls.name, section]
+        );
+        if (!existing.rows.length) {
+          await client.query(
+            `INSERT INTO classes (school_id, academic_year_id, name, section) VALUES ($1,$2,$3,$4)`,
+            [schoolId, ayId, cls.name, section]
+          );
+          created++;
+        }
+      }
+    }
+    return sendSuccess(res, { message: `${created} classes created`, total: DEFAULT_CLASSES.reduce((s, c) => s + c.sections.length, 0) });
+  } catch (e: unknown) {
+    return sendError(res, e instanceof Error ? e.message : 'Failed');
+  } finally { client.release(); }
+}
+
 export async function listClasses(req: Request, res: Response) {
   const schoolId = req.user!.school_id;
   const client = await appPool.connect();

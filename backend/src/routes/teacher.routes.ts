@@ -6,6 +6,7 @@ const router = Router();
 router.use(authenticate, requireRole('teacher'));
 
 router.get('/dashboard',                          Teacher.getMyDashboard);
+router.put('/profile',                            Teacher.updateTeacherProfile);
 router.get('/classes',                            Teacher.getMyClasses);
 router.get('/all-classes',                        Teacher.getAllClasses);
 router.get('/subjects',                           Teacher.getSubjects);

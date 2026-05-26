@@ -37,6 +37,12 @@ class ParentHomeworkScreen extends ConsumerWidget {
         title: Text('Homework · $className',
             style: const TextStyle(fontWeight: FontWeight.w700)),
         automaticallyImplyLeading: !embedded,
+        leading: embedded
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => Navigator.maybePop(context),
+              )
+            : null,
       ),
       body: hwAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

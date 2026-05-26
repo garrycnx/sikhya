@@ -318,7 +318,7 @@ class StudentProfileScreen extends ConsumerWidget {
     try {
       final r = await ApiClient.instance.get(ApiConstants.teacherAllClasses);
       classes = r.data['data'] as List<dynamic>;
-      classes.removeWhere((c) => c['id'] == student['id']);
+      classes.removeWhere((c) => c['id'] == student['class_id']);
     } catch (_) {}
     if (!context.mounted) return;
     String? selected;
@@ -532,7 +532,14 @@ class _ParentTile extends StatelessWidget {
               await ApiClient.instance.delete(
                   ApiConstants.removeStudentParent(studentId, parent['id'] as String));
               onRemoved();
-            } catch (_) {}
+            } on DioException catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(e.response?.data?['error'] ?? 'Failed to remove parent'),
+                  backgroundColor: Colors.red,
+                ));
+              }
+            }
           },
         ),
       ]),

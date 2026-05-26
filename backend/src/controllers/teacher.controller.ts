@@ -61,6 +61,11 @@ const transferStudentSchema = z.object({
   to_class_id: z.string().uuid(),
 });
 
+const updateTeacherProfileSchema = z.object({
+  full_name: z.string().min(2).max(200).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+});
+
 const tagParentSchema = z.object({
   mobile:   z.string().min(10).max(15),
   name:     z.string().min(1).max(200),
@@ -76,6 +81,31 @@ const markAttendanceSchema = z.object({
     remarks: z.string().optional(),
   })).min(1),
 });
+
+export async function updateTeacherProfile(req: Request, res: Response) {
+  const p = updateTeacherProfileSchema.safeParse(req.body);
+  if (!p.success) return sendError(res, p.error.errors[0].message, 422);
+  const teacherId = req.user!.id;
+  const schoolId  = req.user!.school_id;
+  const client = await appPool.connect();
+  try {
+    await client.query(`SET app.current_school_id = '${schoolId}'`);
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+    if (p.data.full_name) { fields.push(`full_name = $${idx++}`); values.push(p.data.full_name); }
+    if (p.data.email !== undefined) { fields.push(`email = $${idx++}`); values.push(p.data.email || null); }
+    if (!fields.length) return sendError(res, 'No fields to update', 422);
+    values.push(teacherId);
+    const r = await client.query(
+      `UPDATE teachers SET ${fields.join(', ')}, updated_at = NOW()
+       WHERE id = $${idx} RETURNING id, full_name, email, mobile`,
+      values
+    );
+    if (!r.rows.length) return sendError(res, 'Teacher not found', 404);
+    return sendSuccess(res, r.rows[0]);
+  } finally { client.release(); }
+}
 
 export async function getMyDashboard(req: Request, res: Response) {
   const teacherId = req.user!.id;
@@ -240,7 +270,7 @@ export async function getStudentProfile(req: Request, res: Response) {
       `SELECT s.id, s.full_name, s.admission_no, s.roll_number, s.gender,
               s.date_of_birth, s.profile_photo, s.is_active,
               s.address, s.emergency_contact,
-              c.name AS class_name, c.section
+              c.id AS class_id, c.name AS class_name, c.section
        FROM students s
        JOIN classes c ON c.id = s.class_id
        WHERE s.id = $1 AND s.school_id = $2`,
@@ -249,7 +279,7 @@ export async function getStudentProfile(req: Request, res: Response) {
     if (!studentRes.rows.length) return sendError(res, 'Student not found', 404);
 
     const parentsRes = await client.query(
-      `SELECT p.full_name, p.mobile, p.email, p.relation
+      `SELECT p.id, p.full_name, p.mobile, p.email, p.relation
        FROM parents p
        JOIN parent_students ps ON ps.parent_id = p.id
        WHERE ps.student_id = $1`,
