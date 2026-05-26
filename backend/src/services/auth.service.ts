@@ -60,7 +60,9 @@ export async function requestOtp(schoolSubdomain: string, mobile: string, admiss
     } finally { client.release(); }
   }
 
-  const otp     = generateOtp(parseInt(process.env.OTP_LENGTH || '6'));
+  const otp     = process.env.SKIP_SMS === 'true'
+    ? (process.env.DEFAULT_OTP || '000000')
+    : generateOtp(parseInt(process.env.OTP_LENGTH || '6'));
   const otpHash = await hashOtp(otp);
 
   await redisClient.setEx(
@@ -70,7 +72,7 @@ export async function requestOtp(schoolSubdomain: string, mobile: string, admiss
   );
   await redisClient.incr(attKey);
   await redisClient.expire(attKey, 600);
-  await sendOtpSms(mobile, otp);
+  if (process.env.SKIP_SMS !== 'true') await sendOtpSms(mobile, otp);
 
   return { message: 'OTP sent to ' + mobile.slice(0, -4) + '****', userName };
 }
