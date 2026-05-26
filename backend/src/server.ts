@@ -10,6 +10,7 @@ dotenv.config();
 import { checkDbConnection } from './config/database';
 import { connectRedis } from './config/redis';
 import router from './routes';
+import { startBirthdayJob } from './jobs/birthday.job';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000');
@@ -48,6 +49,7 @@ async function start() {
   try {
     await checkDbConnection();
     await connectRedis();
+    startBirthdayJob();
     app.listen(PORT, () => {
       console.log('\n  Server -> http://localhost:' + PORT + '/api/v1');
       console.log('  Health -> http://localhost:' + PORT + '/api/v1/health\n');

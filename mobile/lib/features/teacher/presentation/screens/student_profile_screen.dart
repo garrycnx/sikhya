@@ -126,44 +126,31 @@ class StudentProfileScreen extends ConsumerWidget {
                   _contactRow(Icons.emergency_outlined, 'Emergency Contact', student['emergency_contact'] as String),
                   const SizedBox(height: 10),
                 ],
-                if (parents.isNotEmpty) ...[
-                  const Divider(height: 16),
-                  ...parents.map((p) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.people_outline, size: 18, color: AppColors.primary),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(p['full_name'] as String,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${(p['relation'] as String? ?? 'Parent').replaceFirst(
-                            (p['relation'] as String? ?? 'parent')[0],
-                            (p['relation'] as String? ?? 'parent')[0].toUpperCase()
-                          )}  •  ${p['mobile'] as String}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                        ),
-                        if (p['email'] != null && (p['email'] as String).isNotEmpty)
-                          Text(p['email'] as String,
-                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      ])),
-                    ]),
-                  )),
-                ],
                 if ((student['address'] == null || (student['address'] as String).isEmpty) &&
                     (student['emergency_contact'] == null || (student['emergency_contact'] as String).isEmpty) &&
                     parents.isEmpty)
                   const Text('No contact information available',
                     style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               ]),
+            )),
+
+            // Parents / Guardian section
+            SliverToBoxAdapter(child: _sectionCard(
+              title: 'Parents / Guardians',
+              trailing: IconButton(
+                icon: const Icon(Icons.person_add_alt_1_rounded,
+                    color: AppColors.primary, size: 22),
+                tooltip: 'Tag parent',
+                onPressed: () => _showTagParentDialog(context, ref, studentId),
+              ),
+              child: parents.isEmpty
+                  ? const Text('No parents tagged yet. Tap + to add.',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary))
+                  : Column(children: parents.map((p) => _ParentTile(
+                      parent: p as Map<String, dynamic>,
+                      studentId: studentId,
+                      onRemoved: () => ref.invalidate(studentProfileProvider(studentId)),
+                    )).toList()),
             )),
 
             // Attendance summary
@@ -290,7 +277,7 @@ class StudentProfileScreen extends ConsumerWidget {
     ],
   );
 
-  Widget _sectionCard({required String title, required Widget child}) => Container(
+  Widget _sectionCard({required String title, required Widget child, Widget? trailing}) => Container(
     margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -299,7 +286,11 @@ class StudentProfileScreen extends ConsumerWidget {
       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      Row(children: [
+        Expanded(child: Text(title,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+        if (trailing != null) trailing,
+      ]),
       const SizedBox(height: 12),
       child,
     ]),
@@ -405,11 +396,146 @@ class StudentProfileScreen extends ConsumerWidget {
     }
   }
 
+  void _showTagParentDialog(BuildContext context, WidgetRef ref, String studentId) {
+    final nameCtrl   = TextEditingController();
+    final mobileCtrl = TextEditingController();
+    final relCtrl    = TextEditingController(text: 'parent');
+    final formKey    = GlobalKey<FormState>();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Tag Parent / Guardian'),
+        content: Form(
+          key: formKey,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextFormField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Parent Name *'),
+              validator: (v) => v?.isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: mobileCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Mobile Number *', prefixText: '+91 '),
+              validator: (v) => (v?.length ?? 0) < 10 ? 'Enter 10-digit number' : null,
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: relCtrl,
+              decoration: const InputDecoration(labelText: 'Relation (parent/guardian/etc)'),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(context);
+              try {
+                await ApiClient.instance.post(
+                  ApiConstants.tagParent(studentId),
+                  data: {
+                    'name':     nameCtrl.text.trim(),
+                    'mobile':   '+91${mobileCtrl.text.trim()}',
+                    'relation': relCtrl.text.trim(),
+                  },
+                );
+                ref.invalidate(studentProfileProvider(studentId));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Parent tagged successfully')));
+                }
+              } on DioException catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(e.response?.data?['error'] ?? 'Failed to tag parent'),
+                    backgroundColor: Colors.red));
+                }
+              }
+            },
+            child: const Text('Tag Parent'),
+          ),
+        ],
+      ),
+    );
+  }
+
   static Uint8List? _decodePhoto(String? photo) {
     if (photo == null || photo.isEmpty) return null;
     try {
       final data = photo.contains(',') ? photo.split(',').last : photo;
       return base64Decode(data);
     } catch (_) { return null; }
+  }
+}
+
+// ── Parent Tile ───────────────────────────────────────────────────────────────
+
+class _ParentTile extends StatelessWidget {
+  final Map<String, dynamic> parent;
+  final String studentId;
+  final VoidCallback onRemoved;
+  const _ParentTile({required this.parent, required this.studentId, required this.onRemoved});
+
+  @override
+  Widget build(BuildContext context) {
+    final relation = (parent['relation'] as String? ?? 'parent');
+    final relLabel = relation[0].toUpperCase() + relation.substring(1);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+      ),
+      child: Row(children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: AppColors.primary.withOpacity(0.12),
+          child: Text(
+            (parent['full_name'] as String).isNotEmpty
+                ? (parent['full_name'] as String)[0].toUpperCase() : '?',
+            style: const TextStyle(
+                color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 16),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(parent['full_name'] as String,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text('$relLabel  •  ${parent['mobile'] as String}',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ])),
+        IconButton(
+          icon: const Icon(Icons.link_off_rounded, size: 18, color: Colors.red),
+          tooltip: 'Remove',
+          onPressed: () async {
+            final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
+              title: const Text('Remove Parent'),
+              content: Text('Remove ${parent['full_name']} from this student?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Remove', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ));
+            if (ok != true) return;
+            try {
+              await ApiClient.instance.delete(
+                  ApiConstants.removeStudentParent(studentId, parent['id'] as String));
+              onRemoved();
+            } catch (_) {}
+          },
+        ),
+      ]),
+    );
   }
 }

@@ -1,7 +1,7 @@
 ﻿name: school_mgmt_app
 description: School Management System
 publish_to: none
-version: 1.0   # format: versionName+versionCode  (versionCode must increase each upload)
+version: 1.0.0+2
 
 environment:
   sdk: '^3.11.0'

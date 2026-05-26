@@ -61,6 +61,12 @@ const transferStudentSchema = z.object({
   to_class_id: z.string().uuid(),
 });
 
+const tagParentSchema = z.object({
+  mobile:   z.string().min(10).max(15),
+  name:     z.string().min(1).max(200),
+  relation: z.string().max(30).optional(),
+});
+
 const markAttendanceSchema = z.object({
   class_id: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -954,6 +960,90 @@ export async function getStudentSimpleMarks(req: Request, res: Response) {
       [studentId, schoolId]
     );
     return sendSuccess(res, r.rows);
+  } finally { client.release(); }
+}
+
+// ─── Parent Tagging ───────────────────────────────────────────────────────────
+
+export async function getStudentParents(req: Request, res: Response) {
+  const { studentId } = req.params;
+  const schoolId = req.user!.school_id;
+  const client = await appPool.connect();
+  try {
+    await client.query(`SET app.current_school_id = '${schoolId}'`);
+    const r = await client.query(
+      `SELECT p.id, p.full_name, p.mobile, p.relation, p.email
+       FROM parents p
+       JOIN parent_students ps ON ps.parent_id = p.id
+       WHERE ps.student_id = $1 AND p.is_active = true
+       ORDER BY p.full_name`,
+      [studentId]
+    );
+    return sendSuccess(res, r.rows);
+  } finally { client.release(); }
+}
+
+export async function tagParent(req: Request, res: Response) {
+  const { studentId } = req.params;
+  const p = tagParentSchema.safeParse(req.body);
+  if (!p.success) return sendError(res, p.error.errors[0].message, 422);
+  const schoolId = req.user!.school_id;
+  const client = await appPool.connect();
+  try {
+    await client.query(`SET app.current_school_id = '${schoolId}'`);
+    const studentCheck = await client.query(
+      `SELECT id FROM students WHERE id = $1`, [studentId]
+    );
+    if (!studentCheck.rows.length) return sendError(res, 'Student not found', 404);
+
+    // Find or create parent by mobile within this school
+    let parentId: string;
+    const existing = await client.query(
+      `SELECT id FROM parents WHERE REPLACE(mobile,'+','') = REPLACE($1,'+','')`,
+      [p.data.mobile]
+    );
+    if (existing.rows.length) {
+      parentId = existing.rows[0].id;
+      // Update name/relation if provided
+      await client.query(
+        `UPDATE parents SET full_name=$1, relation=COALESCE($2,relation) WHERE id=$3`,
+        [p.data.name, p.data.relation ?? null, parentId]
+      );
+    } else {
+      const created = await client.query(
+        `INSERT INTO parents (school_id, full_name, mobile, relation)
+         VALUES ($1,$2,$3,$4) RETURNING id`,
+        [schoolId, p.data.name, p.data.mobile, p.data.relation ?? 'parent']
+      );
+      parentId = created.rows[0].id;
+    }
+
+    await client.query(
+      `INSERT INTO parent_students (parent_id, student_id)
+       VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+      [parentId, studentId]
+    );
+
+    const row = await client.query(
+      `SELECT id, full_name, mobile, relation FROM parents WHERE id=$1`, [parentId]
+    );
+    return sendSuccess(res, row.rows[0], 201);
+  } catch (e: unknown) {
+    return sendError(res, e instanceof Error ? e.message : 'Failed', 500);
+  } finally { client.release(); }
+}
+
+export async function removeStudentParent(req: Request, res: Response) {
+  const { studentId, parentId } = req.params;
+  const schoolId = req.user!.school_id;
+  const client = await appPool.connect();
+  try {
+    await client.query(`SET app.current_school_id = '${schoolId}'`);
+    await client.query(
+      `DELETE FROM parent_students WHERE student_id=$1 AND parent_id=$2`,
+      [studentId, parentId]
+    );
+    return sendSuccess(res, { removed: true });
   } finally { client.release(); }
 }
 

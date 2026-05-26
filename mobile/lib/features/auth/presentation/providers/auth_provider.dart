@@ -37,10 +37,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.response?.data?['error'] ?? 'Failed to send OTP');
+      final msg = e.response?.data?['error']
+          ?? '${e.type}: ${e.message}';
+      state = state.copyWith(isLoading: false, error: msg);
       return false;
-    } catch (_) {
-      state = state.copyWith(isLoading: false, error: 'Network error. Check your connection.');
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
       return false;
     }
   }

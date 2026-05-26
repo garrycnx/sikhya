@@ -1,6 +1,5 @@
 class ApiConstants {
-  // For real device: use PC's WiFi IP. For web/emulator: use localhost
-  static const baseUrl       = 'http://192.168.1.69:3000/api/v1';
+  static const baseUrl       = 'https://sikhya-production.up.railway.app/api/v1';
   static const requestOtp    = '/auth/request-otp';
   static const verifyOtp     = '/auth/verify-otp';
   static const loginPin      = '/auth/login-pin';
@@ -33,6 +32,9 @@ class ApiConstants {
   static String teacherStudentSimpleMarks(String studentId) => '/teacher/students/$studentId/simple-marks';
   static String teacherAnnouncementById(String id) => '/teacher/announcements/$id';
   static String teacherTimingRuleById(String id)   => '/teacher/timing-rules/$id';
+  static String studentParents(String studentId)   => '/teacher/students/$studentId/parents';
+  static String tagParent(String studentId)        => '/teacher/students/$studentId/tag-parent';
+  static String removeStudentParent(String studentId, String parentId) => '/teacher/students/$studentId/parents/$parentId';
   // parent marks
   static const parentMarks          = '/parent/marks';
   static const parentAttendance     = '/parent/attendance';

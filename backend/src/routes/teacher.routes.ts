@@ -50,6 +50,11 @@ router.post('/timing-rules',                      Teacher.createTimingRule);
 router.put('/timing-rules/:ruleId',               Teacher.updateTimingRule);
 router.delete('/timing-rules/:ruleId',            Teacher.deleteTimingRule);
 
+// Parent tagging
+router.get('/students/:studentId/parents',        Teacher.getStudentParents);
+router.post('/students/:studentId/tag-parent',    Teacher.tagParent);
+router.delete('/students/:studentId/parents/:parentId', Teacher.removeStudentParent);
+
 // All students across all classes (for marks entry)
 router.get('/all-students',                       Teacher.getAllStudents);
 router.get('/students/:studentId/simple-marks',   Teacher.getStudentSimpleMarks);
